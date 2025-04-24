@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Turnos - Sistema de Gestión de Turnos{% endblock %}
+
+{% block content %}
+{% if modo == 'nuevo' %}
+    <div class="card">
+        <div class="card-header">
+            <h1><i class="fas fa-calendar-plus"></i> Nuevo Turno</h1>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{{ url_for('nuevo_turno') }}">
+                <div class="form-group">
+                    <label for="paciente_id" class="form-label">Paciente:</label>
+                    <select id="paciente_id" name="paciente_id" class="form-control" required>
+                        <option value="">Seleccione un paciente</option>
+                        {% for p in pacientes %}
+                            <option value="{{ p.id }}" {% if paciente_seleccionado and paciente_seleccionado.id == p.id %}selected{% endif %}>
+                                {{ p.nombre }} {{ p.apellido }} ({{ p.dni }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="fecha" class="form-label">Fecha:</label>
+                            <input type="date" id="fecha" name="fecha" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="hora" class="form-label">Hora:</label>
+                            <input type="time" id="hora" name="hora" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="motivo" class="form-label">Motivo de la consulta:</label>
+                    <textarea id="motivo" name="motivo" class="form-control" rows="3"></textarea>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('lista_turnos') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Agendar Turno
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% else %}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h1><i class="fas fa-calendar-alt"></i> Turnos</h1>
+            <a href="{{ url_for('nuevo_turno') }}" class="btn btn-success">
+                <i class="fas fa-plus-circle"></i> Nuevo Turno
+            </a>
+        </div>
+        <div class="card-body">
+            {% if turnos %}
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Hora</th>
+                            <th>Paciente</th>
+                            <th>Motivo</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for turno in turnos %}
+                            <tr>
+                                <td>
+                                    {% if turno.fecha is string %}
+                                        {{ turno.fecha }}
+                                    {% elif turno.fecha is defined and turno.fecha %}
+                                        {{ turno.fecha }}
+                                    {% else %}
+                                        Fecha no disponible
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if turno.hora is string %}
+                                        {{ turno.hora }}
+                                    {% elif turno.hora is defined and turno.hora %}
+                                        {{ turno.hora }}
+                                    {% else %}
+                                        Hora no disponible
+                                    {% endif %}
+                                </td>
+                                <td>{{ turno.nombre }} {{ turno.apellido }}</td>
+                                <td>{{ turno.motivo }}</td>
+                                <td>
+                                    <span class="badge {% if turno.estado == 'pendiente' %}bg-warning{% elif turno.estado == 'completado' %}bg-success{% elif turno.estado == 'cancelado' %}bg-danger{% endif %}">
+                                        {{ turno.estado|capitalize }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <!-- Botón Editar - Asegurarse de usar la clave correcta para el ID -->
+                                    <a href="{{ url_for('editar_turno', id_turno=turno.id) }}" class="btn btn-sm btn-info" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button class="btn btn-sm btn-danger eliminar-turno" data-id="{{ turno.id }}" title="Cancelar">
+                                        <i class="fas fa-times-circle"></i>
+                                    </button>
+                                </td>
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-center">No hay turnos agendados.</p>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+
+<!-- Modal para confirmar cancelación de turno -->
+<div id="modal-cancelar-turno" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4);">
+    <div class="modal-content" style="background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 50%; border-radius: 5px;">
+        <h3>Confirmar Cancelación</h3>
+        <p>¿Estás seguro de que deseas cancelar este turno?</p>
+        <p class="text-warning"><i class="fas fa-exclamation-triangle"></i> Esta acción no se puede deshacer.</p>
+        <div class="d-flex justify-content-between mt-3">
+            <button id="btn-cerrar-modal" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cerrar
+            </button>
+            <form id="form-cancelar-turno" method="post" action="">
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-times-circle"></i> Cancelar Turno
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Mostrar modal para cancelar turno
+    $('.eliminar-turno').click(function() {
+        const id = $(this).data('id');
+        $('#form-cancelar-turno').attr('action', `/turnos/cancelar/${id}`);
+        $('#modal-cancelar-turno').css('display', 'block');
+    });
+    
+    // Cerrar modal
+    $('#btn-cerrar-modal').click(function() {
+        $('#modal-cancelar-turno').css('display', 'none');
+    });
+    
+    // También se cierra haciendo clic fuera
+    $(window).click(function(event) {
+        if ($(event.target).is('#modal-cancelar-turno')) {
+            $('#modal-cancelar-turno').css('display', 'none');
+        }
+    });
+});
+</script>
+{% endblock %}

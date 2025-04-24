@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración - Sistema de Gestión de Turnos{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h1><i class="fas fa-cog"></i> Configuración del Sistema</h1>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{{ url_for('configuracion') }}">
+            <h2 class="mb-3">Configuración de Horarios</h2>
+            
+            <div class="form-group">
+                <label for="horario_inicio" class="form-label">Horario de Inicio:</label>
+                <input type="time" id="horario_inicio" name="horario_inicio" class="form-control" 
+                       value="{{ config.horario_inicio_str }}" required>
+                <small class="form-text text-muted">Hora a partir de la cual se pueden programar turnos.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="horario_fin" class="form-label">Horario de Fin:</label>
+                <input type="time" id="horario_fin" name="horario_fin" class="form-control" 
+                       value="{{ config.horario_fin_str }}" required>
+                <small class="form-text text-muted">Hora hasta la cual se pueden programar turnos.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="duracion_turno" class="form-label">Duración de cada Turno (minutos):</label>
+                <select id="duracion_turno" name="duracion_turno" class="form-control" required>
+                    <option value="15" {% if config.duracion_turno == 15 %}selected{% endif %}>15 minutos</option>
+                    <option value="30" {% if config.duracion_turno == 30 or not config.duracion_turno %}selected{% endif %}>30 minutos</option>
+                    <option value="45" {% if config.duracion_turno == 45 %}selected{% endif %}>45 minutos</option>
+                    <option value="60" {% if config.duracion_turno == 60 %}selected{% endif %}>1 hora</option>
+                    <option value="90" {% if config.duracion_turno == 90 %}selected{% endif %}>1 hora y 30 minutos</option>
+                    <option value="120" {% if config.duracion_turno == 120 %}selected{% endif %}>2 horas</option>
+                </select>
+                <small class="form-text text-muted">Tiempo asignado a cada turno.</small>
+            </div>
+            
+            <h2 class="mb-3 mt-4">Configuración de Correo Electrónico</h2>
+            <div class="alert alert-info">
+                <p>Para habilitar los recordatorios por correo electrónico, debes configurar las variables de entorno en tu archivo <code>.env</code> o directamente en el servidor:</p>
+                <ul>
+                    <li><strong>MAIL_SERVER</strong>: Servidor SMTP (ej. smtp.gmail.com)</li>
+                    <li><strong>MAIL_PORT</strong>: Puerto SMTP (ej. 587)</li>
+                    <li><strong>MAIL_USE_TLS</strong>: Usar TLS (True/False)</li>
+                    <li><strong>MAIL_USERNAME</strong>: Tu dirección de correo</li>
+                    <li><strong>MAIL_PASSWORD</strong>: Tu contraseña o clave de aplicación</li>
+                    <li><strong>MAIL_DEFAULT_SENDER</strong>: Remitente por defecto</li>
+                </ul>
+            </div>
+            
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Volver al Dashboard
+                </a>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save"></i> Guardar Configuración
+                </button>
+            </div>
+        </form>
+        
+        <hr class="mt-4 mb-4">
+        
+        <div class="mt-3">
+            <h2 class="mb-3">Herramientas del Sistema</h2>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> <strong>Precaución:</strong> Las siguientes opciones son para fines de desarrollo y pruebas.
+            </div>
+            
+            <div class="d-flex">
+                <a href="{{ url_for('inicializar_db') }}" class="btn btn-warning mr-2" onclick="return confirm('¿Estás seguro de que deseas inicializar la base de datos con datos de ejemplo? Esta acción no eliminará los datos existentes.')">
+                    <i class="fas fa-database"></i> Inicializar con Datos de Ejemplo
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,303 @@
+    {% extends "base.html" %}
+
+    {% block title %}Calendario - Sistema de Gestión de Turnos{% endblock %}
+
+    {% block extra_css %}
+    <style>
+        .horarios-disponibles {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .horario-btn {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .horario-btn:hover {
+            background-color: #e9ecef;
+        }
+        
+        .horario-btn.selected {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+    </style>
+    {% endblock %}
+
+    {% block content %}
+    {% if modo == 'nuevo_turno' %}
+        <div class="card">
+            <div class="card-header">
+                <h1><i class="fas fa-calendar-plus"></i> Nuevo Turno</h1>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('nuevo_turno') }}" id="form-nuevo-turno">
+                    <div class="form-group">
+                        <label for="id_paciente" class="form-label">Paciente:</label>
+                        <select id="id_paciente" name="id_paciente" class="form-control" required>
+                            <option value="">Seleccione un paciente</option>
+                            {% for paciente in pacientes %}
+                                <option value="{{ paciente.id_paciente }}">{{ paciente.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha" class="form-label">Fecha:</label>
+                        <input type="date" id="fecha" name="fecha" class="form-control" value="{{ fecha_turno }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="hora" class="form-label">Hora:</label>
+                        <input type="time" id="hora" name="hora" class="form-control" required>
+                        
+                        <div class="mt-2">
+                            <button type="button" id="btn-buscar-horarios" class="btn btn-info btn-sm">
+                                <i class="fas fa-clock"></i> Ver horarios disponibles
+                            </button>
+                        </div>
+                        
+                        <div class="horarios-disponibles" id="horarios-disponibles"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="notas" class="form-label">Notas:</label>
+                        <textarea id="notas" name="notas" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('calendario') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> Guardar Turno
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% elif modo == 'editar_turno' %}
+        <div class="card">
+            <div class="card-header">
+                <h1><i class="fas fa-calendar-edit"></i> Editar Turno</h1>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('editar_turno', id_turno=turno.id_turno) }}">
+                    <div class="form-group">
+                        <label for="id_paciente" class="form-label">Paciente:</label>
+                        <select id="id_paciente" name="id_paciente" class="form-control" required>
+                            <option value="">Seleccione un paciente</option>
+                            {% for paciente in pacientes %}
+                                <option value="{{ paciente.id_paciente }}" {% if paciente.id_paciente == turno.id_paciente %}selected{% endif %}>
+                                    {{ paciente.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha" class="form-label">Fecha:</label>
+                        <input type="date" id="fecha" name="fecha" class="form-control" value="{{ turno.fecha.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="hora" class="form-label">Hora:</label>
+                        <input type="time" id="hora" name="hora" class="form-control" value="{{ turno.hora.strftime('%H:%M') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="estado" class="form-label">Estado:</label>
+                        <select id="estado" name="estado" class="form-control" required>
+                            <option value="pendiente" {% if turno.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                            <option value="confirmado" {% if turno.estado == 'confirmado' %}selected{% endif %}>Confirmado</option>
+                            <option value="cancelado" {% if turno.estado == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                            <option value="atendido" {% if turno.estado == 'atendido' %}selected{% endif %}>Atendido</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="notas" class="form-label">Notas:</label>
+                        <textarea id="notas" name="notas" class="form-control" rows="3">{{ turno.notas }}</textarea>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <a href="{{ url_for('calendario') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="button" id="btn-eliminar-turno" class="btn btn-danger ml-2">
+                                <i class="fas fa-trash-alt"></i> Eliminar
+                            </button>
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> Actualizar Turno
+                        </button>
+                    </div>
+                </form>
+                <!-- Formulario oculto para eliminar -->
+                <form id="form-eliminar" method="post" action="{{ url_for('eliminar_turno', id_turno=turno.id_turno) }}" style="display: none;"></form>
+            </div>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-header">
+                <div class="calendar-header">
+                    <h1 class="calendar-title">
+                        <i class="fas fa-calendar-alt"></i> {{ nombre_mes }} {{ anio }}
+                    </h1>
+                    <div class="calendar-nav">
+                        <a href="{{ url_for('calendario', mes=mes-1, anio=anio) }}" class="btn btn-primary">
+                            <i class="fas fa-chevron-left"></i> Mes Anterior
+                        </a>
+                        <a href="{{ url_for('calendario', mes=mes, anio=anio) }}" class="btn btn-secondary">
+
+                            Hoy
+                        </a>
+                        <a href="{{ url_for('calendario', mes=mes+1, anio=anio) }}" class="btn btn-primary">
+                            Mes Siguiente <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-end mb-3">
+                    <a href="{{ url_for('nuevo_turno') }}" class="btn btn-success">
+                        <i class="fas fa-plus-circle"></i> Nuevo Turno
+                    </a>
+                </div>
+            
+                <table class="calendar">
+                    <thead>
+                        <tr>
+                            <th>Domingo</th>
+                            <th>Lunes</th>
+                            <th>Martes</th>
+                            <th>Miércoles</th>
+                            <th>Jueves</th>
+                            <th>Viernes</th>
+                            <th>Sábado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for semana in calendario %}
+                            <tr>
+                                {% for dia in semana %}
+                                    {% if dia != 0 %}
+                                        {% set fecha_actual = fechas_calendario[dia] %}
+                                        <td class="{% if es_hoy %}today{% endif %}">
+                                            <div class="day-number">
+                                                {{ dia }}
+                                                <a href="{{ url_for('nuevo_turno', fecha=fecha_actual.strftime('%Y-%m-%d')) }}" class="btn btn-sm btn-primary ml-2">
+                                                    <i class="fas fa-plus"></i>
+                                                </a>
+                                            </div>
+                
+                                            {% for turno in turnos_dia %}
+                                                <div class="appointment {{ turno.estado }}">
+                                                    <strong>{{ turno.hora.strftime('%H:%M') }}</strong> - {{ turno.paciente_nombre }}
+                                                    <div class="d-flex justify-content-end">
+                                                        <a href="{{ url_for('editar_turno', id_turno=turno.id_turno) }}" class="btn btn-sm btn-info mr-2">
+                                                            <i class="fas fa-edit"></i>
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            {% endfor %}
+                                        </td>
+                                    {% else %}
+                                        <td></td>
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+            </div>
+        </div>
+    {% endif %}
+             
+            
+
+    <!-- Modal para confirmar eliminación -->
+    <div id="modal-eliminar" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4);">
+        <div class="modal-content" style="background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 50%; border-radius: 5px;">
+            <h3>Confirmar Eliminación</h3>
+            <p>¿Estás seguro de que deseas eliminar este turno?</p>
+            <p class="text-warning"><i class="fas fa-exclamation-triangle"></i> Esta acción no se puede deshacer.</p>
+            <div class="d-flex justify-content-between mt-3">
+                <button id="btn-cancelar-eliminar" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button id="btn-confirmar-eliminar" class="btn btn-danger">
+                    <i class="fas fa-trash-alt"></i> Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endblock %}
+
+    {% block extra_js %}
+    <script>
+    $(document).ready(function() {
+        // Función para buscar horarios disponibles
+        $('#btn-buscar-horarios').click(function() {
+            const fecha = $('#fecha').val();
+            
+            if (!fecha) {
+                alert('Por favor selecciona una fecha primero');
+                return;
+            }
+            
+            // Mostrar indicador de carga
+            $('#horarios-disponibles').html('<p>Cargando horarios disponibles...</p>');
+            
+            $.ajax({
+                url: '/api/horarios_disponibles',
+                method: 'GET',
+                data: { fecha: fecha },
+                success: function(response) {
+                    if (response.horarios_disponibles && response.horarios_disponibles.length > 0) {
+                        let horariosHTML = '';
+                        
+                        response.horarios_disponibles.forEach(function(horario) {
+                            horariosHTML += `<div class="horario-btn" data-hora="${horario}">${horario}</div>`;
+                        });
+                        
+                        $('#horarios-disponibles').html(horariosHTML);
+                        
+                        // Evento click para seleccionar un horario
+                        $('.horario-btn').click(function() {
+                            const hora = $(this).data('hora');
+                            $('#hora').val(hora);
+                            
+                            // Remover clase selected de todos los botones
+                            $('.horario-btn').removeClass('selected');
+                            // Agregar clase selected al botón clickeado
+                            $(this).addClass('selected');
+                        });
+                    } else {
+                        $('#horarios-disponibles').html('<p>No hay horarios disponibles para esta fecha</p>');
+                    }
+                },
+                error: function() {
+                    $('#horarios-disponibles').html('<p>Error al cargar los horarios disponibles</p>');
+                }
+            });
+        });
+        
+        // Mostrar modal de confirmación para eliminar turno
+        $('#btn-eliminar-turno').click(function() {
+            $('#modal-eliminar').css('display', 'block');
+        });
+        
+        // Cerrar modal
+        $('#btn-cancelar-eliminar').click(function() {
+            $('#modal-eliminar').css('display', 'none');
+        });
+        
+        // Confirmar eliminación
+        $('#btn-confirmar-eliminar').click(function() {
+            $('#form-eliminar').submit();
+        });
+    });
+    </script>
+    {% endblock %}

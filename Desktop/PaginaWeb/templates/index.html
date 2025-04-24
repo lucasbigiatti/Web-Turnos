@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Turnos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav class="navbar">
+                <a href="{{ url_for('index') }}" class="navbar-brand">
+                    <i class="fas fa-calendar-check"></i> TurnoSys
+                </a>
+                <ul class="navbar-menu">
+                    <li class="navbar-item">
+                        <a href="{{ url_for('dashboard') }}" class="navbar-link">
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="navbar-item">
+                        <a href="{{ url_for('calendario') }}" class="navbar-link">
+                            <i class="fas fa-calendar-alt"></i> Calendario
+                        </a>
+                    </li>
+                    <li class="navbar-item">
+                        <a href="{{ url_for('lista_pacientes') }}" class="navbar-link">
+                            <i class="fas fa-user-friends"></i> Pacientes
+                        </a>
+                    </li>
+                    <li class="navbar-item">
+                        <a href="{{ url_for('configuracion') }}" class="navbar-link">
+                            <i class="fas fa-cog"></i> Configuración
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container mt-3">
+        <div class="card">
+            <div class="card-header">
+                <h1>Bienvenido al Sistema de Gestión de Turnos</h1>
+            </div>
+            <div class="card-body">
+                <p>Este sistema te permite gestionar turnos, pacientes y configuraciones de forma eficiente.</p>
+                
+                <div class="d-flex justify-content-between mt-3">
+                    <a href="{{ url_for('calendario') }}" class="btn btn-primary">
+                        <i class="fas fa-calendar-alt"></i> Ver Calendario
+                    </a>
+                    <a href="{{ url_for('lista_pacientes') }}" class="btn btn-info">
+                        <i class="fas fa-user-friends"></i> Gestionar Pacientes
+                    </a>
+                    <a href="{{ url_for('nuevo_turno') }}" class="btn btn-success">
+                        <i class="fas fa-plus-circle"></i> Crear Nuevo Turno
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="mt-3 p-3 text-center">
+        <div class="container">
+            <p>&copy; 2025 TurnoSys - Sistema de Gestión de Turnos</p>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+</body>
+</html>

@@ -8,6 +8,8 @@ import calendar
 import locale
 from db_conexion import db
 
+
+
 # Configurar el locale para español
 try:
     locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')  # Para sistemas Linux/Mac
@@ -32,6 +34,14 @@ app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
 app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', '')
 
 mail = Mail(app)
+
+from datetime import datetime  # Asegúrate de que esta importación esté presente
+
+# Añade esta función a tu archivo app.py
+@app.context_processor
+def inject_now():
+    return {'now': datetime.now()}
+
 
 
 @app.before_request
@@ -650,7 +660,7 @@ def lista_turnos():
 
 
 
-# Rutas para configuración
+# Ruta configuracion
 @app.route('/configuracion', methods=['GET', 'POST'])
 def configuracion():
     # Simulamos un usuario para desarrollo
@@ -658,6 +668,12 @@ def configuracion():
     
     # Obtener la configuración actual
     config = Configuracion.obtener_por_usuario(id_usuario)
+    
+    # Valores por defecto para campos opcionales
+    if not hasattr(config, 'enviar_confirmacion'):
+        config.enviar_confirmacion = True
+    if not hasattr(config, 'enviar_recordatorio'):
+        config.enviar_recordatorio = False
     
     # Convertir timedeltas a strings formateados para la vista
     if config.horario_inicio:

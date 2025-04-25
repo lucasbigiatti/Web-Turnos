@@ -3,78 +3,191 @@
 {% block title %}Configuración - Sistema de Gestión de Turnos{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <h1><i class="fas fa-cog"></i> Configuración del Sistema</h1>
-    </div>
-    <div class="card-body">
-        <form method="post" action="{{ url_for('configuracion') }}">
-            <h2 class="mb-3">Configuración de Horarios</h2>
-            
-            <div class="form-group">
-                <label for="horario_inicio" class="form-label">Horario de Inicio:</label>
-                <input type="time" id="horario_inicio" name="horario_inicio" class="form-control" 
-                       value="{{ config.horario_inicio_str }}" required>
-                <small class="form-text text-muted">Hora a partir de la cual se pueden programar turnos.</small>
-            </div>
-            
-            <div class="form-group">
-                <label for="horario_fin" class="form-label">Horario de Fin:</label>
-                <input type="time" id="horario_fin" name="horario_fin" class="form-control" 
-                       value="{{ config.horario_fin_str }}" required>
-                <small class="form-text text-muted">Hora hasta la cual se pueden programar turnos.</small>
-            </div>
-            
-            <div class="form-group">
-                <label for="duracion_turno" class="form-label">Duración de cada Turno (minutos):</label>
-                <select id="duracion_turno" name="duracion_turno" class="form-control" required>
-                    <option value="15" {% if config.duracion_turno == 15 %}selected{% endif %}>15 minutos</option>
-                    <option value="30" {% if config.duracion_turno == 30 or not config.duracion_turno %}selected{% endif %}>30 minutos</option>
-                    <option value="45" {% if config.duracion_turno == 45 %}selected{% endif %}>45 minutos</option>
-                    <option value="60" {% if config.duracion_turno == 60 %}selected{% endif %}>1 hora</option>
-                    <option value="90" {% if config.duracion_turno == 90 %}selected{% endif %}>1 hora y 30 minutos</option>
-                    <option value="120" {% if config.duracion_turno == 120 %}selected{% endif %}>2 horas</option>
-                </select>
-                <small class="form-text text-muted">Tiempo asignado a cada turno.</small>
-            </div>
-            
-            <h2 class="mb-3 mt-4">Configuración de Correo Electrónico</h2>
-            <div class="alert alert-info">
-                <p>Para habilitar los recordatorios por correo electrónico, debes configurar las variables de entorno en tu archivo <code>.env</code> o directamente en el servidor:</p>
-                <ul>
-                    <li><strong>MAIL_SERVER</strong>: Servidor SMTP (ej. smtp.gmail.com)</li>
-                    <li><strong>MAIL_PORT</strong>: Puerto SMTP (ej. 587)</li>
-                    <li><strong>MAIL_USE_TLS</strong>: Usar TLS (True/False)</li>
-                    <li><strong>MAIL_USERNAME</strong>: Tu dirección de correo</li>
-                    <li><strong>MAIL_PASSWORD</strong>: Tu contraseña o clave de aplicación</li>
-                    <li><strong>MAIL_DEFAULT_SENDER</strong>: Remitente por defecto</li>
-                </ul>
-            </div>
-            
-            <div class="d-flex justify-content-between mt-4">
-                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-                    <i class="fas fa-arrow-left"></i> Volver al Dashboard
-                </a>
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-save"></i> Guardar Configuración
-                </button>
-            </div>
-        </form>
-        
-        <hr class="mt-4 mb-4">
-        
-        <div class="mt-3">
-            <h2 class="mb-3">Herramientas del Sistema</h2>
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle"></i> <strong>Precaución:</strong> Las siguientes opciones son para fines de desarrollo y pruebas.
-            </div>
-            
-            <div class="d-flex">
-                <a href="{{ url_for('inicializar_db') }}" class="btn btn-warning mr-2" onclick="return confirm('¿Estás seguro de que deseas inicializar la base de datos con datos de ejemplo? Esta acción no eliminará los datos existentes.')">
-                    <i class="fas fa-database"></i> Inicializar con Datos de Ejemplo
-                </a>
-            </div>
+<div class="container">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h1><i class="fas fa-cog me-2"></i>Configuración del Sistema</h1>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{{ url_for('configuracion') }}">
+                <!-- Horarios de Atención -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h4><i class="fas fa-clock me-2"></i>Horarios de Atención</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="horario_inicio" class="form-label">Horario de inicio:</label>
+                                    <input type="time" id="horario_inicio" name="horario_inicio" class="form-control" value="{{ config.horario_inicio_str }}" required>
+                                    <div class="form-text">Hora a la que comienza tu jornada laboral</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="horario_fin" class="form-label">Horario de fin:</label>
+                                    <input type="time" id="horario_fin" name="horario_fin" class="form-control" value="{{ config.horario_fin_str }}" required>
+                                    <div class="form-text">Hora a la que finaliza tu jornada laboral</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="lunes" name="dias_atencion" value="lunes" {% if 'lunes' in config.dias_atencion %}checked{% endif %}>
+                                    <label class="form-check-label" for="lunes">Lunes</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="martes" name="dias_atencion" value="martes" {% if 'martes' in config.dias_atencion %}checked{% endif %}>
+                                    <label class="form-check-label" for="martes">Martes</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="miercoles" name="dias_atencion" value="miercoles" {% if 'miercoles' in config.dias_atencion %}checked{% endif %}>
+                                    <label class="form-check-label" for="miercoles">Miércoles</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="jueves" name="dias_atencion" value="jueves" {% if 'jueves' in config.dias_atencion %}checked{% endif %}>
+                                    <label class="form-check-label" for="jueves">Jueves</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="viernes" name="dias_atencion" value="viernes" {% if 'viernes' in config.dias_atencion %}checked{% endif %}>
+                                    <label class="form-check-label" for="viernes">Viernes</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="sabado" name="dias_atencion" value="sabado" {% if 'sabado' in config.dias_atencion %}checked{% endif %}>
+                                    <label class="form-check-label" for="sabado">Sábado</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="domingo" name="dias_atencion" value="domingo" {% if 'domingo' in config.dias_atencion %}checked{% endif %}>
+                                    <label class="form-check-label" for="domingo">Domingo</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Configuración de Turnos -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h4><i class="fas fa-calendar-alt me-2"></i>Configuración de Turnos</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="duracion_turno" class="form-label">Duración de turnos:</label>
+                                    <select id="duracion_turno" name="duracion_turno" class="form-select">
+                                        <option value="15" {% if config.duracion_turno == 15 %}selected{% endif %}>15 minutos</option>
+                                        <option value="20" {% if config.duracion_turno == 20 %}selected{% endif %}>20 minutos</option>
+                                        <option value="30" {% if config.duracion_turno == 30 %}selected{% endif %}>30 minutos</option>
+                                        <option value="45" {% if config.duracion_turno == 45 %}selected{% endif %}>45 minutos</option>
+                                        <option value="60" {% if config.duracion_turno == 60 %}selected{% endif %}>1 hora</option>
+                                        <option value="90" {% if config.duracion_turno == 90 %}selected{% endif %}>1 hora 30 minutos</option>
+                                        <option value="120" {% if config.duracion_turno == 120 %}selected{% endif %}>2 horas</option>
+                                    </select>
+                                    <div class="form-text">Tiempo predeterminado para cada turno</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="intervalo_turnos" class="form-label">Intervalo entre turnos:</label>
+                                    <select id="intervalo_turnos" name="intervalo_turnos" class="form-select">
+                                        <option value="0" {% if config.intervalo_turnos == 0 %}selected{% endif %}>Sin intervalo</option>
+                                        <option value="5" {% if config.intervalo_turnos == 5 %}selected{% endif %}>5 minutos</option>
+                                        <option value="10" {% if config.intervalo_turnos == 10 %}selected{% endif %}>10 minutos</option>
+                                        <option value="15" {% if config.intervalo_turnos == 15 %}selected{% endif %}>15 minutos</option>
+                                        <option value="30" {% if config.intervalo_turnos == 30 %}selected{% endif %}>30 minutos</option>
+                                    </select>
+                                    <div class="form-text">Tiempo de descanso entre turnos consecutivos</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="max_turnos_dia" class="form-label">Máximo de turnos por día:</label>
+                                    <input type="number" id="max_turnos_dia" name="max_turnos_dia" class="form-control" min="1" max="50" value="{{ config.max_turnos_dia or 20 }}">
+                                    <div class="form-text">Limita el número de turnos que puedes tener en un día</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="dias_anticipacion" class="form-label">Días de anticipación:</label>
+                                    <input type="number" id="dias_anticipacion" name="dias_anticipacion" class="form-control" min="1" max="365" value="{{ config.dias_anticipacion or 30 }}">
+                                    <div class="form-text">Cuántos días en adelante se pueden agendar turnos</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Configuración de Notificaciones -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h4><i class="fas fa-bell me-2"></i>Configuración de Notificaciones</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="enviar_confirmacion" name="enviar_confirmacion" {% if config.enviar_confirmacion %}checked{% endif %}>
+                            <label class="form-check-label" for="enviar_confirmacion">Enviar correo de confirmación al crear un turno</label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="enviar_recordatorio" name="enviar_recordatorio" {% if config.enviar_recordatorio %}checked{% endif %}>
+                            <label class="form-check-label" for="enviar_recordatorio">Enviar recordatorio antes del turno</label>
+                        </div>
+                        
+                        <div class="ms-4 mb-3 {% if not config.enviar_recordatorio %}d-none{% endif %}" id="opciones-recordatorio">
+                            <label for="horas_recordatorio" class="form-label">Horas de anticipación:</label>
+                            <select id="horas_recordatorio" name="horas_recordatorio" class="form-select">
+                                <option value="1" {% if config.horas_recordatorio == 1 %}selected{% endif %}>1 hora antes</option>
+                                <option value="2" {% if config.horas_recordatorio == 2 %}selected{% endif %}>2 horas antes</option>
+                                <option value="6" {% if config.horas_recordatorio == 6 %}selected{% endif %}>6 horas antes</option>
+                                <option value="12" {% if config.horas_recordatorio == 12 %}selected{% endif %}>12 horas antes</option>
+                                <option value="24" {% if config.horas_recordatorio == 24 %}selected{% endif %}>24 horas antes</option>
+                                <option value="48" {% if config.horas_recordatorio == 48 %}selected{% endif %}>2 días antes</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="pedir_confirmacion" name="pedir_confirmacion" {% if config.pedir_confirmacion %}checked{% endif %}>
+                            <label class="form-check-label" for="pedir_confirmacion">Solicitar confirmación al paciente</label>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Las notificaciones se enviarán al correo electrónico de los pacientes. Asegúrate de que tengan un correo válido registrado.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-save me-2"></i>Guardar Configuración
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Mostrar/ocultar opciones de recordatorio según checkbox
+    $('#enviar_recordatorio').change(function() {
+        if($(this).is(':checked')) {
+            $('#opciones-recordatorio').removeClass('d-none');
+        } else {
+            $('#opciones-recordatorio').addClass('d-none');
+        }
+    });
+});
+</script>
 {% endblock %}

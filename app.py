@@ -34,7 +34,6 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', '')
 mail = Mail(app)
 
 
-
 @app.before_request
 def before_request():
     """Asegura que la conexión a la base de datos esté disponible antes de cada solicitud."""
@@ -339,7 +338,24 @@ def nuevo_turno():
                 paciente_info = Paciente.obtener_por_id(paciente_id)
                 nombre_paciente = f"{paciente_info.nombre} {paciente_info.apellido}" if paciente_info else "desconocido"
                 
-                flash(f'Turno para {nombre_paciente} agendado exitosamente para el {fecha_str} a las {hora_str}', 'success')
+                # Intentar enviar correo de confirmación
+                mensaje_email = ""
+                
+                # Crear un objeto turno simplificado para la notificación
+                class TurnoTemp:
+                    pass
+                
+                turno_obj = TurnoTemp()
+                turno_obj.id = turno_id
+                turno_obj.fecha = fecha
+                turno_obj.hora = hora
+                turno_obj.motivo = motivo
+                turno_obj.estado = 'pendiente'
+                
+                if enviar_recordatorio_turno(turno_obj, paciente_info, 'confirmacion'):
+                    mensaje_email = " Se ha enviado un correo de confirmación."
+                
+                flash(f'Turno para {nombre_paciente} agendado exitosamente para el {fecha_str} a las {hora_str}.{mensaje_email}', 'success')
                 return redirect(url_for('lista_turnos'))
             else:
                 flash('Error al agendar el turno', 'danger')
@@ -353,8 +369,13 @@ def nuevo_turno():
 def editar_turno(id_turno):
     """Edita un turno existente."""
     try:
-        # Obtener el turno
-        query_turno = "SELECT * FROM turnos WHERE id = %s"
+        # Obtener el turno directamente de la base de datos
+        query_turno = """
+        SELECT t.*, p.nombre, p.apellido 
+        FROM turnos t
+        JOIN pacientes p ON t.paciente_id = p.id
+        WHERE t.id = %s
+        """
         result = db.execute_query(query_turno, (id_turno,))
         
         if not result or len(result) == 0:
@@ -362,7 +383,7 @@ def editar_turno(id_turno):
             return redirect(url_for('dashboard'))
         
         turno = result[0]
-        print("Turno cargado:", turno)  # Para depuración
+        print(f"DEBUG - Turno cargado: {turno}, tipo de hora: {type(turno['hora'])}")
         
         # Obtener todos los pacientes para el selector
         pacientes = Paciente.obtener_todos()
@@ -375,7 +396,7 @@ def editar_turno(id_turno):
             motivo = request.form.get('motivo')
             estado = request.form.get('estado')
             
-            print(f"Datos del formulario - fecha: {fecha_str}, hora: {hora_str}")  # Para depuración
+            print(f"DEBUG - Datos del formulario - fecha: {fecha_str}, hora: {hora_str}")
             
             # Convertir strings a objetos date y time
             fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date() if fecha_str else None
@@ -397,51 +418,59 @@ def editar_turno(id_turno):
         # Si es GET, obtener el paciente del turno
         paciente_seleccionado = Paciente.obtener_por_id(turno['paciente_id'])
         
-        # Preparar datos para el formulario
         # Formatear fecha para el formulario
-        fecha_form = ''
-        if 'fecha' in turno and turno['fecha']:
-            if isinstance(turno['fecha'], date):
-                fecha_form = turno['fecha'].strftime('%Y-%m-%d')
-            elif isinstance(turno['fecha'], str):
+        if isinstance(turno['fecha'], date):
+            turno['fecha_form'] = turno['fecha'].strftime('%Y-%m-%d')
+        else:
+            try:
+                fecha_obj = datetime.strptime(str(turno['fecha']), '%Y-%m-%d').date()
+                turno['fecha_form'] = fecha_obj.strftime('%Y-%m-%d')
+            except (ValueError, TypeError):
                 try:
-                    # Intentar convertir desde diferentes formatos
-                    if '/' in turno['fecha']:
-                        fecha_obj = datetime.strptime(turno['fecha'], '%d/%m/%Y').date()
+                    fecha_obj = datetime.strptime(str(turno['fecha']), '%d/%m/%Y').date()
+                    turno['fecha_form'] = fecha_obj.strftime('%Y-%m-%d')
+                except (ValueError, TypeError):
+                    turno['fecha_form'] = str(turno['fecha'])
+        
+        # Formatear hora para el formulario - CORRECCIÓN CLAVE AQUÍ
+        if isinstance(turno['hora'], time):
+            # Si es un objeto time de Python, formatearlo a HH:MM
+            hora_str = turno['hora'].strftime('%H:%M')
+            print(f"DEBUG - Tipo time, hora formateada: {hora_str}")
+            turno['hora_form'] = hora_str
+        elif isinstance(turno['hora'], str):
+            # Si ya es una cadena, intentar formatearla según su formato actual
+            if ':' in turno['hora']:
+                parts = turno['hora'].split(':')
+                if len(parts) >= 2:
+                    # Extraer solo HH:MM de cualquier formato de hora
+                    hora_str = f"{parts[0]}:{parts[1]}"
+                    print(f"DEBUG - Tipo str con ':', hora formateada: {hora_str}")
+                    turno['hora_form'] = hora_str
+                else:
+                    turno['hora_form'] = turno['hora']
+            else:
+                turno['hora_form'] = turno['hora']
+        else:
+            # Para otros tipos, usar repr y logear para diagnóstico
+            print(f"DEBUG - Tipo desconocido: {type(turno['hora'])}, valor: {turno['hora']}")
+            try:
+                hora_str = str(turno['hora'])
+                if ':' in hora_str:
+                    parts = hora_str.split(':')
+                    if len(parts) >= 2:
+                        turno['hora_form'] = f"{parts[0]}:{parts[1]}"
                     else:
-                        fecha_obj = datetime.strptime(turno['fecha'], '%Y-%m-%d').date()
-                    fecha_form = fecha_obj.strftime('%Y-%m-%d')
-                except ValueError:
-                    fecha_form = turno['fecha']
+                        turno['hora_form'] = hora_str
+                else:
+                    turno['hora_form'] = hora_str
+            except:
+                turno['hora_form'] = ""
         
-        # Formatear hora para el formulario
-        hora_form = ''
-        if 'hora' in turno and turno['hora']:
-            if isinstance(turno['hora'], time):
-                hora_form = turno['hora'].strftime('%H:%M')
-            elif isinstance(turno['hora'], str):
-                try:
-                    # Intentar diferentes formatos
-                    if ':' in turno['hora']:
-                        if turno['hora'].count(':') == 1:
-                            # Formato HH:MM
-                            hora_form = turno['hora']
-                        else:
-                            # Formato HH:MM:SS
-                            hora_obj = datetime.strptime(turno['hora'], '%H:%M:%S').time()
-                            hora_form = hora_obj.strftime('%H:%M')
-                    else:
-                        hora_form = turno['hora']
-                except ValueError:
-                    hora_form = turno['hora']
+        # Log para diagnóstico
+        print(f"DEBUG - Valores formateados - fecha_form: {turno.get('fecha_form')}, hora_form: {turno.get('hora_form')}")
         
-        print(f"Valores formateados - fecha_form: {fecha_form}, hora_form: {hora_form}")  # Para depuración
-        
-        # Añadir campos formateados al turno
-        turno['fecha_form'] = fecha_form
-        turno['hora_form'] = hora_form
-        
-        # Mostrar formulario de edición
+        # Mostrar formulario de edición con los valores formateados
         return render_template('editar_turno.html', 
                               turno=turno, 
                               paciente_seleccionado=paciente_seleccionado,
@@ -455,12 +484,36 @@ def editar_turno(id_turno):
 @app.route('/turnos/cancelar/<int:id_turno>', methods=['POST'])
 def cancelar_turno(id_turno):
     """Cancela un turno."""
-    # Actualizar el estado del turno a 'cancelado'
-    query = "UPDATE turnos SET estado = 'cancelado' WHERE id = %s"
-    db.execute_update(query, (id_turno,))
+    try:
+        # Verificar que el turno exista
+        query_check = "SELECT * FROM turnos WHERE id = %s"
+        result = db.execute_query(query_check, (id_turno,))
+        
+        if not result or len(result) == 0:
+            flash('Turno no encontrado', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Actualizar el estado del turno a 'cancelado'
+        query = "UPDATE turnos SET estado = 'cancelado' WHERE id = %s"
+        db.execute_update(query, (id_turno,))
+        
+        # Obtener información del turno para el mensaje
+        paciente_id = result[0]['paciente_id']
+        paciente = Paciente.obtener_por_id(paciente_id)
+        paciente_nombre = f"{paciente.nombre} {paciente.apellido}" if paciente else "desconocido"
+        
+        flash(f'Turno de {paciente_nombre} cancelado exitosamente', 'success')
+        
+        # Redireccionar de vuelta a la página desde donde se realizó la acción
+        referer = request.headers.get('Referer')
+        if referer and 'lista_turnos' in referer:
+            return redirect(url_for('lista_turnos'))
+        else:
+            return redirect(url_for('dashboard'))
     
-    flash('Turno cancelado exitosamente', 'success')
-    return redirect(url_for('lista_turnos'))
+    except Exception as e:
+        flash(f'Error al cancelar el turno: {str(e)}', 'danger')
+        return redirect(url_for('dashboard'))
 
 @app.route('/turnos/eliminar/<int:id_turno>', methods=['POST'])
 def eliminar_turno(id_turno):
@@ -489,12 +542,53 @@ def cambiar_estado_turno(id_turno, estado):
         if estado not in estados_validos:
             return jsonify({'success': False, 'error': 'Estado no válido'})
         
+        # Obtener información del turno y paciente antes de actualizar
+        query_info = """
+        SELECT t.*, p.id as pid, p.nombre, p.apellido, p.email, p.telefono, p.dni
+        FROM turnos t
+        JOIN pacientes p ON t.paciente_id = p.id
+        WHERE t.id = %s
+        """
+        turno_info = db.execute_query(query_info, (id_turno,))
+        
+        if not turno_info or len(turno_info) == 0:
+            return jsonify({'success': False, 'error': 'Turno no encontrado'})
+            
+        turno_data = turno_info[0]
+        
         # Actualizar el estado en la base de datos
         query = "UPDATE turnos SET estado = %s WHERE id = %s"
         result = db.execute_update(query, (estado, id_turno))
         
         if result is not None:
             print(f"Turno {id_turno} cambiado a estado {estado}")
+            
+            # Si el estado es confirmado o cancelado, enviar notificación
+            if estado in ['confirmado', 'cancelado']:
+                # Crear objetos para la notificación
+                class TurnoTemp:
+                    pass
+                
+                class PacienteTemp:
+                    pass
+                
+                turno_obj = TurnoTemp()
+                turno_obj.id = turno_data['id']
+                turno_obj.fecha = turno_data['fecha']
+                turno_obj.hora = turno_data['hora']
+                turno_obj.motivo = turno_data['motivo']
+                turno_obj.estado = estado
+                
+                paciente_obj = PacienteTemp()
+                paciente_obj.id = turno_data['pid']
+                paciente_obj.nombre = turno_data['nombre']
+                paciente_obj.apellido = turno_data['apellido']
+                paciente_obj.email = turno_data['email']
+                paciente_obj.dni = turno_data['dni']
+                
+                # Enviar correo
+                enviar_recordatorio_turno(turno_obj, paciente_obj, 'cambio_estado')
+            
             return jsonify({'success': True})
         else:
             print(f"Error al cambiar estado del turno {id_turno}")
@@ -503,6 +597,40 @@ def cambiar_estado_turno(id_turno, estado):
         print(f"Excepción al cambiar estado del turno: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
     
+@app.route('/test-email/<int:id_paciente>')
+def test_email(id_paciente):
+    """Ruta para probar el envío de emails."""
+    try:
+        # Obtener información del paciente
+        paciente = Paciente.obtener_por_id(id_paciente)
+        
+        if not paciente:
+            flash('Paciente no encontrado', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        # Crear un turno de prueba
+        class TurnoTemp:
+            pass
+        
+        turno = TurnoTemp()
+        turno.fecha = date.today() + timedelta(days=1)
+        turno.hora = time(10, 0)
+        turno.motivo = "Prueba de correo electrónico"
+        turno.estado = "confirmado"
+        
+        # Intentar enviar el correo
+        if enviar_recordatorio_turno(turno, paciente, 'confirmacion'):
+            flash(f'Correo enviado exitosamente a {paciente.email}', 'success')
+        else:
+            flash(f'Error al enviar correo a {paciente.email}', 'danger')
+        
+        return redirect(url_for('dashboard'))
+    except Exception as e:
+        flash(f'Error al probar envío de correo: {str(e)}', 'danger')
+        return redirect(url_for('dashboard'))    
+
+
+
 @app.route('/turnos')
 def lista_turnos():
     """Muestra la lista de turnos."""
@@ -588,50 +716,117 @@ def configuracion():
     
     return render_template('configuracion.html', config=config)
 
-# Función para enviar recordatorios por email
-def enviar_recordatorio_turno(turno, paciente):
+def enviar_recordatorio_turno(turno, paciente, tipo='confirmacion'):
+    """
+    Envía un correo electrónico relacionado con un turno.
+    
+    Tipos:
+    - confirmacion: cuando se crea un nuevo turno
+    - recordatorio: para recordar un turno próximo
+    - cambio_estado: cuando cambia el estado del turno
+    """
     # Si no hay configuración de correo, no enviamos nada
     if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD']:
+        print("No se ha configurado el correo electrónico")
         return False
     
-    # Obtener datos del profesional
-    profesional = Usuario.obtener_por_id(turno.id_usuario)
-    
-    # Formatear fecha y hora para el mensaje
-    fecha_formateada = turno.fecha.strftime('%A %d de %B de %Y').capitalize()
-    hora_formateada = turno.hora.strftime('%H:%M')
-    
-    # Crear el mensaje
-    asunto = f'Confirmación de Turno - {fecha_formateada}'
-    
-    cuerpo = f"""
-    Hola {paciente.nombre},
-    
-    Este es un recordatorio de su turno programado:
-    
-    Fecha: {fecha_formateada}
-    Hora: {hora_formateada}
-    Profesional: {profesional.nombre if profesional else 'No especificado'}
-    
-    Por favor, confirme su asistencia o avise con anticipación en caso de no poder asistir.
-    
-    Saludos cordiales,
-    Sistema de Gestión de Turnos
-    """
-    
-    msg = Message(
-        subject=asunto,
-        recipients=[paciente.email],
-        body=cuerpo
-    )
+    # Si el paciente no tiene email, no podemos enviar
+    if not hasattr(paciente, 'email') or not paciente.email:
+        print(f"El paciente no tiene email registrado")
+        return False
     
     try:
+        # Formatear fecha y hora para el mensaje
+        if isinstance(turno.fecha, date):
+            fecha_formateada = turno.fecha.strftime('%A %d de %B de %Y').capitalize()
+        else:
+            try:
+                fecha_obj = datetime.strptime(str(turno.fecha), '%Y-%m-%d').date()
+                fecha_formateada = fecha_obj.strftime('%A %d de %B de %Y').capitalize()
+            except:
+                fecha_formateada = str(turno.fecha)
+            
+        if isinstance(turno.hora, time):
+            hora_formateada = turno.hora.strftime('%H:%M')
+        else:
+            try:
+                if ':' in str(turno.hora):
+                    partes = str(turno.hora).split(':')
+                    hora_formateada = f"{partes[0]}:{partes[1]}"
+                else:
+                    hora_formateada = str(turno.hora)
+            except:
+                hora_formateada = str(turno.hora)
+        
+        # Definir asunto y cuerpo según el tipo
+        if tipo == 'confirmacion':
+            asunto = f'Confirmación de Turno - {fecha_formateada}'
+            cuerpo = f"""
+            Hola {paciente.nombre},
+            
+            Se ha agendado un turno para usted:
+            
+            Fecha: {fecha_formateada}
+            Hora: {hora_formateada}
+            Motivo: {turno.motivo if hasattr(turno, 'motivo') else 'No especificado'}
+            
+            Por favor, confirme su asistencia o avise con anticipación en caso de no poder asistir.
+            
+            Saludos cordiales,
+            Sistema de Gestión de Turnos
+            """
+        elif tipo == 'cambio_estado':
+            asunto = f'Actualización de Turno - {fecha_formateada}'
+            estado_str = {'pendiente': 'pendiente de confirmación', 
+                          'confirmado': 'confirmado', 
+                          'completado': 'completado', 
+                          'cancelado': 'cancelado'}.get(turno.estado, str(turno.estado))
+            
+            cuerpo = f"""
+            Hola {paciente.nombre},
+            
+            Le informamos que el estado de su turno ha cambiado a: {estado_str.upper()}
+            
+            Detalles del turno:
+            Fecha: {fecha_formateada}
+            Hora: {hora_formateada}
+            Motivo: {turno.motivo if hasattr(turno, 'motivo') else 'No especificado'}
+            
+            Saludos cordiales,
+            Sistema de Gestión de Turnos
+            """
+        else:
+            asunto = f'Información sobre su Turno - {fecha_formateada}'
+            cuerpo = f"""
+            Hola {paciente.nombre},
+            
+            Información sobre su turno:
+            
+            Fecha: {fecha_formateada}
+            Hora: {hora_formateada}
+            Motivo: {turno.motivo if hasattr(turno, 'motivo') else 'No especificado'}
+            Estado: {turno.estado if hasattr(turno, 'estado') else 'No especificado'}
+            
+            Saludos cordiales,
+            Sistema de Gestión de Turnos
+            """
+        
+        # Crear y enviar el mensaje
+        msg = Message(
+            subject=asunto,
+            recipients=[paciente.email],
+            body=cuerpo
+        )
+        
         mail.send(msg)
+        print(f"Correo enviado a {paciente.email}: {asunto}")
         return True
     except Exception as e:
         print(f"Error al enviar correo: {e}")
+        import traceback
+        traceback.print_exc()
         return False
-
+    
 # API para obtener horarios disponibles
 @app.route('/api/horarios_disponibles', methods=['GET'])
 def api_horarios_disponibles():
@@ -649,109 +844,8 @@ def api_horarios_disponibles():
     
     # Convertir timedeltas a time objects
     if config.horario_inicio:
-        total_seconds = config.horario_inicio.total_seconds()
-        hours = int(total_seconds // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        horario_inicio = time(hours, minutes)
-    else:
-        horario_inicio = time(9, 0)  # 9:00 AM default
-        
-    if config.horario_fin:
-        total_seconds = config.horario_fin.total_seconds()
-        hours = int(total_seconds // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        horario_fin = time(hours, minutes)
-    else:
-        horario_fin = time(18, 0)  # 6:00 PM default
-    
-    # Obtener turnos existentes para esa fecha y usuario
-    turnos_ocupados = Turno.obtener_por_fecha_y_usuario(fecha, id_usuario)
-    horas_ocupadas = [turno.hora for turno in turnos_ocupados]
-    
-    # Generar todos los horarios posibles según la configuración
-    horarios_disponibles = []
-    
-    # Convertir a datetime para poder hacer aritmética con timedelta
-    dt_inicio = datetime.combine(fecha, horario_inicio)
-    dt_fin = datetime.combine(fecha, horario_fin)
-    duracion = timedelta(minutes=config.duracion_turno or 30)
-    
-    current = dt_inicio
-    while current + duracion <= dt_fin:
-        # Si la hora actual no está ocupada, la agregamos como disponible
-        if current.time() not in horas_ocupadas:
-            horarios_disponibles.append(current.strftime('%H:%M'))
-        current += duracion
-    
-    return jsonify({
-        'fecha': fecha_str,
-        'horarios_disponibles': horarios_disponibles
-    })
+        total_seconds = config.horario_inicio
 
-# Función para inicializar la base de datos con datos de ejemplo
-@app.route('/inicializar_db', methods=['GET'])
-def inicializar_db():
-    # Crear usuarios/profesionales de ejemplo
-    usuario1 = Usuario(
-        nombre="Dr. Juan Pérez",
-        email="juan.perez@ejemplo.com",
-        telefono="123456789",
-        especialidad="Medicina General"
-    )
-    usuario1.guardar()
-    
-    # Crear configuración para el usuario
-    config = Configuracion(
-        id_usuario=1,  # ID del usuario recién creado
-        horario_inicio=timedelta(hours=9),  # 9:00 AM
-        horario_fin=timedelta(hours=17),    # 5:00 PM
-        duracion_turno=30           # 30 minutos
-    )
-    config.guardar()
-    
-    # Crear pacientes de ejemplo
-    paciente1 = Paciente(
-        nombre="María González",
-        email="maria@ejemplo.com",
-        telefono="987654321",
-        fecha_nacimiento=date(1985, 5, 15)
-    )
-    paciente1.guardar()
-    
-    paciente2 = Paciente(
-        nombre="Carlos Rodríguez",
-        email="carlos@ejemplo.com",
-        telefono="555123456",
-        fecha_nacimiento=date(1990, 10, 20)
-    )
-    paciente2.guardar()
-    
-    # Crear algunos turnos de ejemplo
-    hoy = date.today()
-    manana = hoy + timedelta(days=1)
-    
-    turno1 = Turno(
-        id_paciente=1,
-        id_usuario=1,
-        fecha=hoy,
-        hora=time(10, 0),
-        estado="confirmado",
-        notas="Primera consulta"
-    )
-    turno1.guardar()
-    
-    turno2 = Turno(
-        id_paciente=2,
-        id_usuario=1,
-        fecha=manana,
-        hora=time(11, 0),
-        estado="pendiente",
-        notas="Control de rutina"
-    )
-    turno2.guardar()
-    
-    flash('Base de datos inicializada con datos de ejemplo', 'success')
-    return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='127.0.0.1', port=5000)       

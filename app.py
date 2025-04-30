@@ -3,7 +3,7 @@ from flask_mail import Mail, Message
 from datetime import datetime, timedelta, date, time
 import os
 from dotenv import load_dotenv
-from models import Usuario, Paciente, Turno, Configuracion
+from models import Usuario, Paciente, Turno
 import calendar
 import locale
 from db_conexion import db
@@ -660,78 +660,6 @@ def lista_turnos():
 
 
 
-# Ruta configuracion
-@app.route('/configuracion', methods=['GET', 'POST'])
-def configuracion():
-    # Simulamos un usuario para desarrollo
-    id_usuario = 1
-    
-    # Obtener la configuración actual
-    config = Configuracion.obtener_por_usuario(id_usuario)
-    
-    # Valores por defecto para campos opcionales
-    if not hasattr(config, 'enviar_confirmacion'):
-        config.enviar_confirmacion = True
-    if not hasattr(config, 'enviar_recordatorio'):
-        config.enviar_recordatorio = False
-    
-    # Convertir timedeltas a strings formateados para la vista
-    if config.horario_inicio:
-        total_seconds = config.horario_inicio.total_seconds()
-        hours = int(total_seconds // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        config.horario_inicio_str = f"{hours:02d}:{minutes:02d}"
-    else:
-        config.horario_inicio_str = "09:00"
-        
-    if config.horario_fin:
-        total_seconds = config.horario_fin.total_seconds()
-        hours = int(total_seconds // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        config.horario_fin_str = f"{hours:02d}:{minutes:02d}"
-    else:
-        config.horario_fin_str = "18:00"
-    
-    if request.method == 'POST':
-        # Actualizar configuración
-        horario_inicio_str = request.form.get('horario_inicio')
-        horario_fin_str = request.form.get('horario_fin')
-        duracion_turno = int(request.form.get('duracion_turno', 30))
-        
-        # Convertir horarios de string a time
-        try:
-            hora_inicio = datetime.strptime(horario_inicio_str, '%H:%M').time()
-            hora_fin = datetime.strptime(horario_fin_str, '%H:%M').time()
-            
-            # Convertir time a timedelta para almacenar
-            config.horario_inicio = timedelta(hours=hora_inicio.hour, minutes=hora_inicio.minute)
-            config.horario_fin = timedelta(hours=hora_fin.hour, minutes=hora_fin.minute)
-        except ValueError:
-            flash('Formato de hora incorrecto', 'error')
-            return redirect(url_for('configuracion'))
-        
-        config.duracion_turno = duracion_turno
-        
-        if config.guardar():
-            flash('Configuración guardada exitosamente', 'success')
-            
-            # Actualizar los strings formateados después de guardar
-            if config.horario_inicio:
-                total_seconds = config.horario_inicio.total_seconds()
-                hours = int(total_seconds // 3600)
-                minutes = int((total_seconds % 3600) // 60)
-                config.horario_inicio_str = f"{hours:02d}:{minutes:02d}"
-                
-            if config.horario_fin:
-                total_seconds = config.horario_fin.total_seconds()
-                hours = int(total_seconds // 3600)
-                minutes = int((total_seconds % 3600) // 60)
-                config.horario_fin_str = f"{hours:02d}:{minutes:02d}"
-        else:
-            flash('Error al guardar la configuración', 'error')
-    
-    return render_template('configuracion.html', config=config)
-
 def enviar_recordatorio_turno(turno, paciente, tipo='confirmacion'):
     """
     Envía un correo electrónico relacionado con un turno.
@@ -855,12 +783,8 @@ def api_horarios_disponibles():
     except (ValueError, TypeError):
         return jsonify({'error': 'Formato de fecha incorrecto'}), 400
     
-    # Obtener configuración del profesional
-    config = Configuracion.obtener_por_usuario(id_usuario)
+
     
-    # Convertir timedeltas a time objects
-    if config.horario_inicio:
-        total_seconds = config.horario_inicio
 
 
 if __name__ == '__main__':
